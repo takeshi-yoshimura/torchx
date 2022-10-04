@@ -262,8 +262,6 @@ def bjobs_msg_to_describe(app_id: str, msg: str) -> Optional[DescribeAppResponse
     total_count = 0
     for line in msg.split("\n"):
         split = line.split(" ")
-        if len(split) < 4:
-            continue
         proj = split[0]
         role, _, idx = split[1][len(proj) + 1 :].rpartition("-")
         idx = int(idx)

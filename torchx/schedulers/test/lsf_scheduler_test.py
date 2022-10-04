@@ -389,6 +389,7 @@ class LsfSchedulerTest(unittest.TestCase):
         )
 
     def test_bjobs_msg_to_describe(self) -> None:
+        # bjobs -noheader -a -P dist_app-c6v2phgkc2j2tc -o  "proj name stat exit_code"
         appid = "dist_app-c6v2phgkc2j2tc"
         msg = "dist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-0 DONE -\ndist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-1 DONE -"
         describe = bjobs_msg_to_describe(appid, msg)
@@ -398,7 +399,15 @@ class LsfSchedulerTest(unittest.TestCase):
             self.assertEqual(describe.state, AppState.SUCCEEDED)
             self.assertEqual(describe.roles[0].num_replicas, 2)
 
+    def test_bjobs_msg_to_describe_no_msg(self) -> None:
+        # bjobs -noheader -a -P dist_app-c6v2phgkc2j2tc -o  "proj name stat exit_code"
+        appid = "dist_app-c6v2phgkc2j2tc"
+        msg = ""
+        describe = bjobs_msg_to_describe(appid, msg)
+        self.assertEqual(describe, None)
+
     def test_bjobs_msg_to_describe_fail(self) -> None:
+        # bjobs -noheader -a -P dist_app-vdkcfm1p7lxcx -o  "proj name stat exit_code"
         appid = "dist_app-vdkcfm1p7lxcx"
         msg = "dist_app-vdkcfm1p7lxcx dist_app-vdkcfm1p7lxcx-dist_app-0 EXIT 1\ndist_app-vdkcfm1p7lxcx dist_app-vdkcfm1p7lxcx-dist_app-1 EXIT 1"
         describe = bjobs_msg_to_describe(appid, msg)
@@ -409,6 +418,7 @@ class LsfSchedulerTest(unittest.TestCase):
             self.assertEqual(describe.roles[0].num_replicas, 2)
 
     def test_bjobs_msg_to_log_file_out(self) -> None:
+        # bjobs -noheader -a -P dist_app-c6v2phgkc2j2tc -o "proj name output_dir"
         msg = "dist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-0 /mnt/data/torchx\ndist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-1 /mnt/data/torchx"
         log_file = bjobs_msg_to_log_file(
             "dist_app-c6v2phgkc2j2tc", "dist_app", k=0, streams=Stream.STDOUT, msg=msg
@@ -418,6 +428,7 @@ class LsfSchedulerTest(unittest.TestCase):
         )
 
     def test_bjobs_msg_to_log_file_err(self) -> None:
+        # bjobs -noheader -a -P dist_app-c6v2phgkc2j2tc -o "proj name output_dir"
         msg = "dist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-0 /mnt/data/torchx\ndist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-1 /mnt/data/torchx"
         log_file = bjobs_msg_to_log_file(
             "dist_app-c6v2phgkc2j2tc", "dist_app", k=0, streams=Stream.STDERR, msg=msg
@@ -427,6 +438,7 @@ class LsfSchedulerTest(unittest.TestCase):
         )
 
     def test_bjobs_msg_to_log_file_combined(self) -> None:
+        # bjobs -noheader -a -P dist_app-c6v2phgkc2j2tc -o "proj name output_dir"
         msg = "dist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-0 /mnt/data/torchx\ndist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-1 /mnt/data/torchx"
         with self.assertRaises(ValueError):
             bjobs_msg_to_log_file(
@@ -438,6 +450,7 @@ class LsfSchedulerTest(unittest.TestCase):
             )
 
     def test_bjobs_msg_to_log_file_no_jobdir(self) -> None:
+        # bjobs -noheader -a -P dist_app-mnhnfk1gvhcqq -o "proj name output_dir"
         msg = "dist_app-mnhnfk1gvhcqq dist_app-mnhnfk1gvhcqq-dist_app-0 -\ndist_app-mnhnfk1gvhcqq dist_app-mnhnfk1gvhcqq-dist_app-1 -"
         with self.assertRaises(ValueError):
             bjobs_msg_to_log_file(
@@ -449,6 +462,7 @@ class LsfSchedulerTest(unittest.TestCase):
             )
 
     def test_bjobs_msg_to_list(self) -> None:
+        # bjobs -noheader -a -o "proj stat exit_code"
         msg = "dist_app-c6v2phgkc2j2tc DONE -\ndist_app-c6v2phgkc2j2tc DONE -\ndist_app-vdkcfm1p7lxcx EXIT 1\ndist_app-vdkcfm1p7lxcx EXIT 1"
         listApps = bjobs_msg_to_list(msg)
         self.assertEqual(len(listApps), 2)
