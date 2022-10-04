@@ -355,6 +355,13 @@ class LsfSchedulerTest(unittest.TestCase):
             "icgen2host-10-240-0-22",
         )
 
+    def test_find_rank0_host_from_bhosts_stdout_too_big_request(self) -> None:
+        role = simple_role()
+        role.resource = Resource(cpu=10000, memMB=1, gpu=1)
+        bhosts_stdout = "icgen2host-10-240-0-21 0 0\nicgen2host-10-240-0-22 16 2\nicgen2host-10-240-0-23 16 2\n"
+        with self.assertRaises(Exception):
+            find_rank0_host_from_bhosts_stdout(bhosts_stdout, role)
+
     def test_get_submit_script(self) -> None:
         app_id = "appid"
         app = simple_app()
@@ -385,8 +392,21 @@ class LsfSchedulerTest(unittest.TestCase):
         appid = "dist_app-c6v2phgkc2j2tc"
         msg = "dist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-0 DONE -\ndist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-1 DONE -"
         describe = bjobs_msg_to_describe(appid, msg)
-        self.assertEqual(describe.app_id, appid)
-        self.assertEqual(describe.roles[0].num_replicas, 2)
+        self.assertIsNot(describe, None)
+        if describe:
+            self.assertEqual(describe.app_id, appid)
+            self.assertEqual(describe.state, AppState.SUCCEEDED)
+            self.assertEqual(describe.roles[0].num_replicas, 2)
+
+    def test_bjobs_msg_to_describe_fail(self) -> None:
+        appid = "dist_app-vdkcfm1p7lxcx"
+        msg = "dist_app-vdkcfm1p7lxcx dist_app-vdkcfm1p7lxcx-dist_app-0 EXIT 1\ndist_app-vdkcfm1p7lxcx dist_app-vdkcfm1p7lxcx-dist_app-1 EXIT 1"
+        describe = bjobs_msg_to_describe(appid, msg)
+        self.assertIsNot(describe, None)
+        if describe:
+            self.assertEqual(describe.app_id, appid)
+            self.assertEqual(describe.state, AppState.FAILED)
+            self.assertEqual(describe.roles[0].num_replicas, 2)
 
     def test_bjobs_msg_to_log_file_out(self) -> None:
         msg = "dist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-0 /mnt/data/torchx\ndist_app-c6v2phgkc2j2tc dist_app-c6v2phgkc2j2tc-dist_app-1 /mnt/data/torchx"
@@ -417,12 +437,25 @@ class LsfSchedulerTest(unittest.TestCase):
                 msg=msg,
             )
 
+    def test_bjobs_msg_to_log_file_no_jobdir(self) -> None:
+        msg = "dist_app-mnhnfk1gvhcqq dist_app-mnhnfk1gvhcqq-dist_app-0 -\ndist_app-mnhnfk1gvhcqq dist_app-mnhnfk1gvhcqq-dist_app-1 -"
+        with self.assertRaises(ValueError):
+            bjobs_msg_to_log_file(
+                "dist_app-mnhnfk1gvhcqq",
+                "dist_app",
+                k=0,
+                streams=Stream.STDERR,
+                msg=msg,
+            )
+
     def test_bjobs_msg_to_list(self) -> None:
-        msg = "dist_app-c6v2phgkc2j2tc DONE -\ndist_app-c6v2phgkc2j2tc DONE -"
+        msg = "dist_app-c6v2phgkc2j2tc DONE -\ndist_app-c6v2phgkc2j2tc DONE -\ndist_app-vdkcfm1p7lxcx EXIT 1\ndist_app-vdkcfm1p7lxcx EXIT 1"
         listApps = bjobs_msg_to_list(msg)
-        self.assertEqual(len(listApps), 1)
+        self.assertEqual(len(listApps), 2)
         self.assertEqual(listApps[0].app_id, "dist_app-c6v2phgkc2j2tc")
         self.assertEqual(listApps[0].state, AppState.SUCCEEDED)
+        self.assertEqual(listApps[1].app_id, "dist_app-vdkcfm1p7lxcx")
+        self.assertEqual(listApps[1].state, AppState.FAILED)
 
     def test_submit_dryrun(self) -> None:
         scheduler = create_scheduler("foo")

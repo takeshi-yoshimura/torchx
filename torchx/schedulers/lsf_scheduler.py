@@ -204,11 +204,8 @@ def find_rank0_host_from_bhosts_stdout(msg: str, role: Role) -> str:
 
     for line in msg.split("\n"):
         split = line.split(" ")
-        try:
-            if len(split) >= 3 and cpu <= int(split[1]) and gpu <= int(split[2]):
-                return split[0]
-        except ValueError:
-            continue
+        if len(split) >= 3 and cpu <= int(split[1]) and gpu <= int(split[2]):
+            return split[0]
     raise Exception(
         f"cannot find a host with {cpu} CPUs, and {gpu} GPUs. Try again with enough available resource."
     )
@@ -306,7 +303,7 @@ def bjobs_msg_to_log_file(
     k: int = 0,
     streams: Optional[Stream] = None,
     msg: str = "",
-) -> Iterable[str]:
+) -> str:
     if streams == Stream.COMBINED:
         raise ValueError(
             "LsfScheduler does not support COMBINED log stream."
@@ -327,6 +324,10 @@ def bjobs_msg_to_log_file(
             role, _, idx = split[1][len(proj) + 1 :].rpartition("-")
             if app_id == proj and role == role_name and idx == str(k):
                 log_file = split[2] + f"/{split[1]}.{extension}"
+    if log_file == "":
+        raise ValueError(
+            f"cannot find log directory for {app_id}. Note: need to specify -cfg jobdir to use this functionality."
+        )
     return log_file
 
 
@@ -456,15 +457,12 @@ class LsfScheduler(Scheduler[LsfOpts]):
 
     def schedule(self, dryrun_info: AppDryRunInfo[LsfBsub]) -> str:
         req = dryrun_info.request
-        jobdir = req.jobdir
         with tempfile.TemporaryDirectory() as tempdir:
-            path = os.path.join(jobdir or tempdir, f"{req.app_id}.sh")
+            path = os.path.join(req.jobdir or tempdir, f"{req.app_id}.sh")
             req.cmd += [path]
-            script = req.materialize(find_rank0_host(req.app.roles[0]))
             with open(path, "w") as f:
-                f.write(script)
-            p = subprocess.run(req.cmd, stdout=subprocess.PIPE, check=True)
-            job_ret = p.stdout.decode("utf-8").strip()
+                f.write(req.materialize(find_rank0_host(req.app.roles[0])))
+            subprocess.run(req.cmd, stdout=subprocess.PIPE, check=True)
         return req.app_id
 
     def _validate(self, app: AppDef, scheduler: str) -> None:
@@ -532,7 +530,6 @@ class LsfScheduler(Scheduler[LsfOpts]):
             check=True,
         )
         log_file = bjobs_msg_to_log_file(
-            scheduler=self,
             app_id=app_id,
             role_name=role_name,
             k=k,
@@ -540,7 +537,7 @@ class LsfScheduler(Scheduler[LsfOpts]):
             msg=p.stdout.decode("utf-8"),
         )
         iterator = split_lines_iterator(
-            LogIterator(app_id, log_file, scheduler, should_tail=should_tail)
+            LogIterator(app_id, log_file, self, should_tail=should_tail)
         )
         if regex:
             iterator = filter_regex(regex, iterator)
